@@ -113,3 +113,135 @@ class ExpressionEvaluator:
 # print(e.parse('2 + 3 * 4'))
 # print(e.parse('2 + (3 + 4) * 5'))
 # # print(e.parse('2 + (3 + * 4)'))
+
+class ExpressionTreeBuilder(ExpressionEvaluator):
+    def expr(self):
+        "expression ::= term { ('+'|'-) term }"
+
+        exprval = self.term()
+        while self._accept("PLUS") or self._accept('MINUS'):
+            op = self.tok.type
+            right = self.factor()
+            if op == "PLUS":
+                exprval = ('+', exprval, right)
+            elif op == "MINUS":
+                exprval = ('-', exprval, right)
+        return exprval
+
+    def term(self):
+        "term ::= factor { ('*'|'/') factor }"
+
+        termval = self.factor()
+        while self._accept('TIMES') or self._accept('DIVIDE'):
+            op = self.tok.type
+            right = self.factor()
+            if op == 'TIMES':
+                termval = ('*', termval, right)
+            elif op == 'DIVIDE':
+                termval = ('/', termval, right)
+        return termval
+    
+    def factor(self):
+        'factor :: = NUM | (expr)'
+
+        if self._accept("NUM"):
+            return int(self.tok.value)
+        elif self._accept('LPAREN'):
+            exprval = self.expr()
+            self._expect('RPAREN')
+            return exprval
+        else: 
+            raise SyntaxError('Expected NUMBER or LPAREN')
+            
+e = ExpressionTreeBuilder()
+print(e.parse('2 + 3'))
+print(e.parse('2 + 3 * 4'))
+print(e.parse('2 + (3 + 4) * 5'))
+print(e.parse('2 + 3 + 4'))
+
+
+from ply.lex import lex
+from ply.yacc import yacc
+
+# Token list
+tokens = [ 'NUM', 'PLUS', 'MINUS', 'TIMES', 'DIVIDE', 'LPAREN', 'RPAREN' ]
+
+# Ignored characters
+
+t_ignore = ' \t\n'
+
+# Token specifications (as regexs)
+t_PLUS   = r'\+'
+t_MINUS  = r'-'
+t_TIMES  = r'\*'
+t_DIVIDE = r'/'
+t_LPAREN = r'\('
+t_RPAREN = r'\)'
+
+# Token processing functions
+def t_NUM(t):
+    r'\d+'
+    t.value = int(t.value)
+    return t
+
+# Error handler
+def t_error(t):
+    print('Bad character: {!r}'.format(t.value[0]))
+    t.skip(1)
+
+# Build the lexer
+lexer = lex()
+
+# Grammar rules and handler functions
+def p_expr(p):
+    '''
+    expr : expr PLUS term
+         | expr MINUS term
+    '''
+    if p[2] == '+':
+        p[0] = p[1] + p[3]
+    elif p[2] == '-':
+        p[0] = p[1] - p[3]
+
+def p_expr_term(p):
+    '''
+    expr : term
+    '''
+    p[0] = p[1]
+
+def p_term(p):
+    '''
+    term : term TIMES factor
+         | term DIVIDE factor
+    '''
+    if p[2] == '*':
+        p[0] = p[1] * p[3]
+    elif p[2] == '/':
+        p[0] = p[1] / p[3]
+
+def p_term_factor(p):
+    '''
+    term : factor
+    '''
+    p[0] = p[1]
+
+def p_factor(p):
+    '''
+    factor : NUM
+    '''
+    p[0] = p[1]
+
+def p_factor_group(p):
+    '''
+    factor : LPAREN expr RPAREN
+    '''
+    p[0] = p[2]
+
+def p_error(p):
+    print('Syntax error')
+
+parser = yacc()
+print(parser.parse('2 + 3'))
+print(parser.parse('2 + 3 * 4'))
+print(parser.parse('2 + (3 + 4) * 5'))
+print(parser.parse('2 + 3 + 4'))
